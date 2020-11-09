@@ -7,6 +7,9 @@ void Get_dir();
 void Print_prefix();
 
 void Input_command();
+void Analysis_command();
+void Run_builtin();
+void Run_external();
 void Run_command();
 void Init();
 
