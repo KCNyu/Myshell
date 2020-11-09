@@ -45,14 +45,10 @@ void Print_prefix(){
 
 char cmd[MAX][MAX];
 int cmd_count = 0;
-int fd[2];
-bool FLAG_EXEC = true,
-     IS_BUITIN = false,
-     IS_EXTERNAL = false,
-     IS_REDIRECT_IN = false,
-     IS_REDIRECT_OUT = false,
-     IS_PIPE = false;
+bool IS_BUITIN = false,
+     IS_EXTERNAL = false;
 const char space[2] = " ";
+char path_old[128];
 
 void Input_command(){
     char* input = (char*)calloc(MAX,sizeof(char));
@@ -66,20 +62,7 @@ void Input_command(){
 }
 void Analysis_command(){
     if(!(strcmp((cmd[0]),"cd")) || !(strcmp(cmd[0],"exit"))) IS_BUITIN = true;
-    else{
-        for(int i = 0; i < cmd_count; i++){
-            if(!strcmp(cmd[i],"|")){
-                IS_PIPE = true;
-            }
-            else if(!strcmp(cmd[i],"<")){
-                IS_REDIRECT_IN = true;
-            }
-            else if(!strcmp(cmd[i],">")){
-                IS_REDIRECT_OUT = true;
-            }
-        }
-        IS_EXTERNAL = true;
-    }
+    else IS_EXTERNAL = true;
 }
 void Run_builtin(){
     if(!strcmp(cmd[0],"exit")) exit(EXIT_SUCCESS);
@@ -96,27 +79,104 @@ void Run_builtin(){
             sprintf(cd_path,"/%s",pwd->pw_name);
             strcpy(cmd[1],cd_path);
         }
+        else if(strcmp(cmd[1],"-") == 0){
+            strcpy(cmd[1],path_old);
+        }
+        getcwd(path_old,sizeof(char)*128);
         if((chdir(cmd[1])) < 0) fprintf(stderr,"%s: failed\n",cmd[0]);
     }
 }
-void Run_external(){
-    int status;
-
-    char** cmd_tmp = (char**)calloc(sizeof(char*),MAX);
-
-    for(int i = 0; i < cmd_count; i++){
-        cmd_tmp[i] = (char*)calloc(MAX,sizeof(char));
-        strcpy(cmd_tmp[i],cmd[i]);
+void Run_external_redirect(int left, int right){
+    int inNum = 0, outNum = 0;
+    char *Input_file = NULL, *Output_file = NULL;
+    int end_index = right;
+    /*
+    for(int i = left; i < right; i++){
+        if(!strcmp(cmd[i],"<")){
+            inNum++;
+            if(i+1 < right) Input_file = cmd[i+1];
+            if(end_index == right) end_index = i;
+        }
+        else if(!strcmp(cmd[i],">")){
+            outNum++;
+            if(i+1 < right) Output_file = cmd[i+1];
+            if(end_index == right) end_index = i;
+        }
+        if(end_index == right) end_index = i;
     }
+    if(inNum == 1){
+        int f;
+        if((f = open(Input_file,O_RDONLY)) < 0){
+            fprintf(stderr,"failed to open the file '%s'",Input_file);
+            return;
+        }
+    }
+    */
     if(fork() == 0){
-        if(execvp(cmd_tmp[0],cmd_tmp) < 0){
-                fprintf(stderr,"%s: command not found\n",cmd[0]);
-                exit(1);
+        /*
+        if(inNum == 1){
+            int f_input = open(Input_file,O_RDONLY);
+            dup2(f_input,STDIN_FILENO);
+        }
+        if(outNum == 1){
+            int f_output = open(Output_file,O_WRONLY|O_CREAT);
+            dup2(f_output,STDOUT_FILENO);
+        }
+        */
+        char** cmd_tmp = (char**)calloc(sizeof(char*),MAX);
+        for(int i = left; i < end_index; i++){
+            cmd_tmp[i] = (char*)calloc(MAX,sizeof(char));
+            strcpy(cmd_tmp[i],cmd[i]);
+        }
+        if(execvp(cmd_tmp[left],cmd_tmp+left) < 0){
+            fprintf(stderr,"%s: command not found\n",cmd_tmp[left]);
+            exit(1);
         }
     }
     else{
+        int status;
         wait(&status);
-        if(WEXITSTATUS(status)) FLAG_EXEC = false;
+        //if(WEXITSTATUS(status)) return;
+    }
+}
+void Run_external_pipe(int left, int right){
+    if(left >= right){ perror("pipe"); return; }
+    int pipe_index = -1;
+    for(int i = left; i < right; i++){
+        if(!strcmp(cmd[i],"|")){
+            pipe_index = i;
+            break;
+        }
+    }
+    if(pipe_index == -1){
+        Run_external_redirect(left,right);
+        return;
+    }
+    int fd[2];
+    pipe(fd);
+    if(fork() == 0){
+        dup2(fd[1],STDOUT_FILENO);
+        close(fd[0]); close(fd[1]);
+        Run_external_pipe(left,pipe_index);
+    }
+    else{
+        int status;
+        wait(&status);
+        if(pipe_index < right){
+            dup2(fd[0],STDIN_FILENO);
+            close(fd[0]); close(fd[1]);
+            Run_external_pipe(pipe_index+1,right);
+        }
+    }
+}
+void Run_external(){
+    if(fork() == 0){
+        Run_external_pipe(0,cmd_count);
+        exit(0);
+    }
+    else{
+        int status;
+        wait(&status);
     }
 }
 void Run_command(){
@@ -130,10 +190,6 @@ void Run_command(){
 void Init(){
     for(int i = 0; i < MAX; i++) strcpy(cmd[i],"\0");
     cmd_count = 0;
-    FLAG_EXEC = true,
     IS_BUITIN = false,
-    IS_EXTERNAL = false,
-    IS_REDIRECT_IN = false,
-    IS_REDIRECT_OUT = false,
-    IS_PIPE = false;
+    IS_EXTERNAL = false;
 }
