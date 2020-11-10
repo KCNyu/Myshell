@@ -10,8 +10,9 @@ void Input_command();
 void Analysis_command();
 void Run_builtin();
 void Run_external();
-void Run_external_pipe(int, int);
-void Run_external_redirect(int, int);
+_Bool Run_external_pipe(int, int);
+_Bool Run_external_redirect(int, int);
+_Bool Run_external_and(int, int);
 void Run_command();
 void Init();
 
