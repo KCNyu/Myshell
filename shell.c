@@ -15,7 +15,7 @@
 #include <pwd.h>
 #include <unistd.h>
 
-#define MAX 64
+#define MAX 128
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -68,11 +68,10 @@ void Analysis_command(){
     if(!strcmp(cmd[0],"") && IS_BACKGROUND){
         read(fd_pid[0],&pid,sizeof(int));
         IS_BACKGROUND = false;
-        IS_END = true;
-        kill(pid,SIGKILL);
         printf("pid = %d has done\n",pid);
+        IS_END = true;
     }
-    else if(!(strcmp((cmd[0]),"cd")) || !(strcmp(cmd[0],"exit"))) IS_BUITIN = true;
+    if(!(strcmp((cmd[0]),"cd")) || !(strcmp(cmd[0],"exit"))) IS_BUITIN = true;
     else{
         IS_EXTERNAL = true;
         if(!strcmp(cmd[cmd_count-1],"&")){
@@ -208,6 +207,7 @@ bool Run_external_and(int left, int right){
     }
 }
 void Run_external(){
+    pipe(fd_pid);
     if(fork() == 0){
         if(IS_BACKGROUND){
             pid = fork();
@@ -216,7 +216,6 @@ void Run_external(){
                 exit(0);
             }
             else{
-                pipe(fd_pid);
                 write(fd_pid[1],&pid,sizeof(int));
                 exit(0);
             }
