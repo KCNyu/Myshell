@@ -62,6 +62,10 @@ void Input_command(){
         while((cmd_tmp[cmd_count] = strtok(NULL,space)) != NULL) cmd_count++;
         cmd_tmp[cmd_count-1][strlen(cmd_tmp[cmd_count-1])-1] = '\0';
     }
+    else{
+        putchar('\n');
+        exit(EXIT_SUCCESS);
+    }
     for(int i = 0; i < cmd_count; i++) strcpy(cmd[i],cmd_tmp[i]);
 }
 void Analysis_command(){
